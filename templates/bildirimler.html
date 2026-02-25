@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container my-5" style="max-width: 800px; margin: 50px auto;">
+    <h2 class="mb-4" style="text-align: center;">🔔 Bildirimleriniz</h2>
+
+    {% if notifications %}
+        
+        <div class="text-right mb-3">
+            <a href="{{ url_for('tumunu_oku') }}" class="cta-button" 
+               style="background-color: #34495e; padding: 8px 15px; font-size: 0.9em;">
+                Tümünü Okundu Olarak İşaretle
+            </a>
+        </div>
+
+        <div class="notification-list">
+            {% for notification in notifications %}
+                <div class="notification-item {% if not notification.read %}unread{% else %}read{% endif %}"
+                     style="background-color: var(--icerik-kart-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; position: relative;">
+                    
+                    {% if not notification.read %}
+                        <span class="unread-dot" 
+                              style="height: 10px; width: 10px; background-color: #e74c3c; border-radius: 50%; display: inline-block; margin-right: 15px;"></span>
+                    {% else %}
+                        <i class="fas fa-check-circle" 
+                           style="color: #2ecc71; margin-right: 15px;"></i>
+                    {% endif %}
+
+                    <div class="notification-content" style="flex-grow: 1;">
+                        <p class="mb-1" style="margin: 0;">{{ notification.message | safe }}</p>
+                        <small class="text-muted" style="color: #aaa;">
+                            {{ notification.timestamp.strftime('%d.%m.%Y %H:%M') }}
+                        </small>
+                    </div>
+
+                    {% if notification.url %}
+                        <a href="{{ url_for(notification.url) }}" class="btn-view-notification cta-button" 
+                           style="background-color: var(--vurgu-renk); padding: 5px 10px; margin-left: 20px; font-size: 0.8em;">
+                            Görüntüle
+                        </a>
+                    {% endif %}
+
+                    {% if not notification.read %}
+                        <a href="{{ url_for('bildirim_oku', notification_id=notification.id) }}" 
+                           class="mark-as-read-link" 
+                           style="margin-left: 15px; color: #7f8c8d; text-decoration: none;"
+                           title="Okundu Olarak İşaretle">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+    {% else %}
+        <div class="text-center p-5 card-custom" 
+             style="background-color: var(--kod-kutu-bg); border-radius: 10px; margin-top: 50px;">
+            <i class="fas fa-inbox fa-3x mb-3" style="color: #7f8c8d;"></i>
+            <p class="lead">Henüz yeni bir bildiriminiz bulunmamaktadır. Harika iş çıkardınız!</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Bildirim Listesine Özel Stil */
+    .notification-item.unread {
+        background-color: var(--kod-kutu-bg) !important; /* Okunmamış bildirimi daha koyu yap */
+        border-left: 5px solid #e74c3c !important; /* Kırmızı çizgi ile vurgula */
+    }
+</style>
+{% endblock %}

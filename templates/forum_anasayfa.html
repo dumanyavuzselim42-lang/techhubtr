@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topluluk Forumu | TechHubTR</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    
+    <style>
+        .forum-container {
+            max-width: 1100px; 
+            margin: 50px auto;
+            padding: 30px;
+            background-color: var(--kod-kutu-bg);
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+        }
+        .forum-header {
+            color: var(--vurgu-renk);
+            border-bottom: 2px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Konu Listesi Stili */
+        .topic-list-container {
+            background-color: #2e343d; 
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .topic-list-container .topic-item {
+            display: grid;
+            /* Yazar, Başlık (Tags), Yorum, Tarih */
+            grid-template-columns: 150px 1fr 100px 150px; 
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #444;
+            transition: background-color 0.2s;
+        }
+        .topic-list-container .topic-item:hover {
+            background-color: #383d47;
+        }
+        
+        /* Liste Başlıkları */
+        .topic-list-container .topic-header {
+            font-weight: bold;
+            color: var(--vurgu-renk);
+            background-color: #242930; 
+        }
+        
+        /* Konu Başlıkları */
+        .topic-item .title a {
+            color: var(--yazi-renk);
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: color 0.3s;
+        }
+        .topic-item .title a:hover {
+            color: var(--vurgu-renk);
+        }
+        
+        .topic-item .author, .topic-item .date, .topic-item .comments {
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        .topic-item .tags-list {
+            margin-top: 5px;
+        }
+        .topic-item .tags-list span {
+            background-color: #444;
+            color: #ccc;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7em;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<header class="navbar">
+    <a href="{{ url_for('index') }}" class="logo-container">
+        <span class="logo-text">TechHubTR</span>
+        <img src="{{ url_for('static', filename='images/techhubtr-logo.png') }}" alt="TechHubTR Resmi Logosu" class="site-logo">
+    </a>
+    
+    <nav>
+        <a href="{{ url_for('index') }}" class="nav-link">Ana Sayfa</a>
+        <a href="{{ url_for('egitim') }}" class="nav-link">Eğitim</a>
+        <a href="{{ url_for('gomulu') }}" class="nav-link">Gömülü Sistemler</a>
+        <a href="{{ url_for('topluluk') }}" class="nav-link">Forum</a>
+        
+        <form action="{{ url_for('arama') }}" method="GET" style="display: inline-block; margin-right: 20px;">
+            <input type="text" name="q" placeholder="Ara..." required style="padding: 5px; border-radius: 3px; border: 1px solid #555; background-color: #333; color: white;">
+        </form>
+        
+        <a href="{{ url_for('iletisim') }}" class="nav-link" style="margin-left: auto;">İletişim</a> 
+        
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('bildirimler') }}" class="nav-link" style="position: relative; margin-right: 15px;">
+                <i class="fas fa-bell"></i> 
+                {% if unread_notifications_count > 0 %}
+                    <span style="position: absolute; top: 0; right: -5px; 
+                                 background-color: red; color: white; 
+                                 border-radius: 50%; padding: 2px 6px; 
+                                 font-size: 10px; line-height: 1;">
+                        {{ unread_notifications_count }}
+                    </span>
+                {% endif %}
+            </a>
+             
+            <a href="{{ url_for('ayarlar') }}" class="nav-link">Ayarlar</a> 
+            <a href="{{ url_for('profil') }}" class="nav-link">Profil</a>
+            <a href="{{ url_for('cikis') }}" class="nav-link">Çıkış Yap</a>
+        {% else %}
+            <a href="{{ url_for('giris') }}" class="nav-link">Giriş Yap</a>
+            <a href="{{ url_for('kayit') }}" class="nav-link">Kayıt Ol</a>
+        {% endif %}
+    </nav>
+</header>
+<!-- KRİTİK: Flash Mesaj Alanı Navbar'dan hemen sonra yerleştirildi -->
+<div class="flash-messages-container" style="max-width: 900px; margin: 20px auto;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message flash-{{ category }}" 
+                     style="padding: 12px; margin-bottom: 10px; border-radius: 6px; 
+                            background-color: {% if category == 'success' %}#27ae60{% elif category == 'danger' %}#e74c3c{% else %}#00bcd4{% endif %}; 
+                            color: white; text-align: center; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+<!-- FLASH MESAJ ALANI SONU -->
+    <main>
+        <div class="forum-container">
+            <div class="forum-header">
+                <h2>TechHubTR Topluluk Forumu</h2>
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('yeni_konu') }}" class="cta-button" style="padding: 8px 15px; font-size: 0.9em; background-color: #e74c3c;">Yeni Konu Aç</a>
+                {% else %}
+                    <p style="font-size: 0.9em; color: #ccc;">Konu açmak için giriş yapın.</p>
+                {% endif %}
+            </div>
+            
+            <div class="topic-list-container">
+                <!-- Konu Başlıkları (Liste Header) -->
+                <div class="topic-item topic-header">
+                    <div class="author">Yazar</div>
+                    <div class="title">Konu Başlığı</div>
+                    <div class="comments">Cevap</div>
+                    <div class="date">Tarih</div>
+                </div>
+
+                <!-- Konu Listesi (Veri Döngüsü) -->
+                {% if topics %}
+                    {% for topic in topics %}
+                        <div class="topic-item">
+                            <div class="author">{{ topic.author.username }}</div>
+                            <div class="title">
+                                <!-- Konu Detay Rotası -->
+                                <a href="{{ url_for('konu_detay', topic_id=topic.id) }}">{{ topic.title }}</a>
+                                <!-- Etiketler -->
+                                <div class="tags-list">
+                                    {% for tag in topic.tags %}
+                                        <span>#{{ tag.name }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="comments">{{ topic.comments|length - 1 }}</div> <!-- İlk mesajı saymıyoruz -->
+                            <div class="date">{{ topic.created_at.strftime('%d %b %Y') }}</div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="text-align: center; color: #aaa; padding: 20px;">Henüz hiç konu açılmamış. İlk konuyu sen aç!</p>
+                {% endif %}
+            </div>
+
+        </div>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 TechHubTR. Tüm Hakları Saklıdır.</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Gömülü Sistemler ve IoT Eğitimleri{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 50px auto; padding: 0 20px;">
+    <h2>Gömülü Sistemler ve Donanım Programlama</h2>
+    <p style="opacity: 0.8;">Mikrodenetleyiciler, RTOS ve endüstriyel otomasyon dünyasını keşfedin.</p>
+
+    <div class="kategori-grid" style="padding: 30px 0; margin: 0;">
+        
+        {% for sub_category_name, lesson_list in categories.items() %}
+        
+            <h2 style="grid-column: 1 / -1; margin-top: 30px; margin-bottom: 10px; color: var(--vurgu-renk); font-size: 1.8em;">
+                {{ sub_category_name.replace('Arduino', 'Arduino Temelleri') }}
+            </h2>
+
+            {% for ders in lesson_list %}
+            <a href="{{ url_for('ders_detay', slug=ders.slug) }}" class="kategori-kart">
+                
+                <span class="alt-konu-etiketi">{{ ders.sub_category }}</span> 
+                
+                <h3>{{ ders.title }}</h3>
+                <p>{{ ders.description }}</p>
+                <div style="font-size: 0.9em; opacity: 0.7;">
+                    Seviye: <strong>{{ ders.level }}</strong> | Modül Sayısı: <strong>{{ ders.lesson_count }}</strong>
+                </div>
+            </a>
+            {% endfor %}
+
+        {% else %}
+        <p style="grid-column: 1 / -1; text-align: center; opacity: 0.7;">
+            Bu kategoriye ait henüz ders bulunmamaktadır. Yönetici panelinden yeni ders ekleyebilirsiniz.
+        </p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arama Sonuçları: {{ query }} | TechHubTR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+</head>
+<body class="{% if current_user.is_authenticated and current_user.theme == 'light' %}light-mode{% endif %}">
+    
+<header class="navbar">
+    <a href="{{ url_for('index') }}" class="logo-container">
+        <span class="logo-text">TechHubTR</span>
+        <img src="{{ url_for('static', filename='images/techhubtr-logo.png') }}" alt="TechHubTR Resmi Logosu" class="site-logo">
+    </a>
+    
+    <nav>
+        <a href="{{ url_for('index') }}" class="nav-link">Ana Sayfa</a>
+        <a href="{{ url_for('egitim') }}" class="nav-link">Eğitim</a>
+        <a href="{{ url_for('gomulu') }}" class="nav-link">Gömülü Sistemler</a>
+        <a href="{{ url_for('topluluk') }}" class="nav-link">Forum</a>
+        
+        <form action="{{ url_for('arama') }}" method="GET" style="display: inline-block; margin-right: 20px;">
+            <input type="text" name="q" placeholder="Ara..." required style="padding: 5px; border-radius: 3px; border: 1px solid #555; background-color: #333; color: white;">
+        </form>
+        
+        <a href="{{ url_for('iletisim') }}" class="nav-link" style="margin-left: auto;">İletişim</a> 
+        
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('bildirimler') }}" class="nav-link" style="position: relative; margin-right: 15px;">
+                <i class="fas fa-bell"></i> 
+                {% if unread_notifications_count > 0 %}
+                    <span style="position: absolute; top: 0; right: -5px; 
+                                 background-color: red; color: white; 
+                                 border-radius: 50%; padding: 2px 6px; 
+                                 font-size: 10px; line-height: 1;">
+                        {{ unread_notifications_count }}
+                    </span>
+                {% endif %}
+            </a>
+             
+            <a href="{{ url_for('ayarlar') }}" class="nav-link">Ayarlar</a> 
+            <a href="{{ url_for('profil') }}" class="nav-link">Profil</a>
+            <a href="{{ url_for('cikis') }}" class="nav-link">Çıkış Yap</a>
+        {% else %}
+            <a href="{{ url_for('giris') }}" class="nav-link">Giriş Yap</a>
+            <a href="{{ url_for('kayit') }}" class="nav-link">Kayıt Ol</a>
+        {% endif %}
+    </nav>
+</header>
+    <div class="flash-messages-container" style="max-width: 900px; margin: 20px auto;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}" 
+                         style="padding: 12px; margin-bottom: 10px; border-radius: 6px; 
+                                background-color: {% if category == 'success' %}#27ae60{% elif category == 'danger' %}#e74c3c{% else %}#00bcd4{% endif %}; 
+                                color: white; text-align: center; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+    
+    <div class="settings-container" style="max-width: 900px;">
+        <h2>Arama Sonuçları: "{{ query }}"</h2>
+        
+        {% if not query %}
+            <p>Lütfen bir arama terimi girin.</p>
+        {% elif not results['lessons'] and not results['topics'] %}
+            <p>"{{ query }}" ile eşleşen ders veya forum konusu bulunamadı.</p>
+        {% else %}
+            
+            <h3 style="color: var(--vurgu-renk); margin-top: 30px;">Dersler ({{ results['lessons']|length }})</h3>
+            {% if results['lessons'] %}
+                <ul>
+                {% for lesson in results['lessons'] %}
+                    <li style="margin-bottom: 10px;">
+                        <a href="{{ url_for('ders_detay', slug=lesson.slug) }}" style="color: var(--yazi-renk); text-decoration: none;">
+                            {{ lesson.title }} ({{ lesson.category }})
+                        </a>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p>Ders bulunamadı.</p>
+            {% endif %}
+
+            <h3 style="color: var(--vurgu-renk); margin-top: 30px;">Forum Konuları ({{ results['topics']|length }})</h3>
+            {% if results['topics'] %}
+                <ul>
+                {% for topic in results['topics'] %}
+                    <li style="margin-bottom: 10px;">
+                        <a href="{{ url_for('konu_detay', topic_id=topic.id) }}" style="color: var(--yazi-renk); text-decoration: none;">
+                            {{ topic.title }} (Yazar: {{ topic.author.username }})
+                        </a>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p>Forum konusu bulunamadı.</p>
+            {% endif %}
+            
+        {% endif %}
+    </div>
+    
+    <footer>
+        <p>&copy; 2025 TechHubTR. Tüm Hakları Saklıdır.</p>
+    </footer>
+</body>
+</html>

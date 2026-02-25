@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container my-5" style="max-width: 900px; margin: 50px auto;">
+    <h2 class="profile-header mb-4" style="text-align: center;">Kullanıcı Profiliniz 👋</h2>
+    <div class="row">
+        
+        <div class="col-md-5">
+            <div class="card shadow-sm text-center card-custom" 
+                 style="padding: 25px; border-radius: 10px; background-color: var(--card-bg-color); color: var(--text-color);">
+                
+                <h5 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 20px;">Hesap Kartı</h5>
+                
+                <img src="{{ url_for('static', filename='avatars/' + current_user.avatar_filename) }}" 
+                     alt="{{ current_user.username }} Avatarı" 
+                     class="rounded-circle mb-3 profile-avatar"
+                     style="width: 120px; height: 120px; object-fit: cover; margin: 0 auto; border: 4px solid var(--primary-color, #007bff);">
+
+                <h3 class="card-title mt-3">{{ current_user.username }}</h3>
+                <p class="text-muted">{{ current_user.email }}</p>
+
+                <hr style="margin: 15px 0; border-color: #555;">
+
+                <div style="background-color: #383838; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                    <h4 style="color: gold; margin-bottom: 5px;">🏆 Rütbe: {{ current_user.rank }}</h4>
+                    <p class="lead" style="font-size: 1.1em; font-weight: bold;">Puan: **{{ current_user.points }}**</p>
+                </div>
+                
+                <a href="{{ url_for('ayarlar') }}" class="cta-button" style="padding: 10px 20px; margin-top: 10px; text-decoration: none; background-color: #3498db; color: white; border-radius: 5px;">
+                    ⚙️ Ayarları Düzenle
+                </a>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <h3 class="mb-4" style="border-bottom: 2px solid #555; padding-bottom: 5px;">Genel İstatistikler</h3>
+            
+            <div class="row">
+                <div class="col-sm-6 mb-3">
+                    <div class="card text-white text-center" style="background-color: #27ae60; padding: 20px; border-radius: 8px;">
+                        <div class="card-body">
+                            <h5 class="card-title">Toplam Katkı</h5>
+                            <p class="card-text" style="font-size: 3em; font-weight: bold;">{{ total_posts }}</p>
+                            <span>(Konu + Yorum Sayısı)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-sm-6 mb-3">
+                    <div class="card text-white text-center" style="background-color: #f39c12; padding: 20px; border-radius: 8px;">
+                        <div class="card-body">
+                            <h5 class="card-title">Kayıt Tarihi</h5>
+                            <p class="card-text" style="font-size: 1.8em; font-weight: bold;">
+                                {{ current_user.created_at.strftime('%d.%m.%Y') }}
+                            </p>
+                            <span>(Siteye katıldığı tarih)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="mt-5 mb-3" style="border-bottom: 2px solid #555; padding-bottom: 5px;">Aktivitelerim</h3>
+            <p class="text-muted" style="background-color: var(--card-bg-color); padding: 15px; border-radius: 5px;">
+                Burada kullanıcının en son açtığı konular ve yaptığı yorumlar listelenecektir. (İleride eklenmesi planlanıyor.)
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

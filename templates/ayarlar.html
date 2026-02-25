@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-container"> 
+    <h2 class="mb-4" style="text-align: center;">⚙️ Hesap Ayarları</h2>
+
+    <div class="settings-header">Profil Resmi Yükleme (Max 1MB)</div>
+    <div class="form-section">
+        <div class="text-center mb-3">
+            <img src="{{ url_for('static', filename='avatars/' + current_user.avatar_filename) }}" 
+                 alt="Mevcut Avatar" 
+                 class="profile-image"> 
+        </div>
+        <form method="POST" action="{{ url_for('ayarlar') }}" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="upload_avatar">
+            <div class="input-group">
+                <label for="avatarFile">Yeni Profil Resmi Seçin (JPG, PNG, GIF)</label>
+                <input type="file" id="avatarFile" name="avatar" required>
+            </div>
+            <button type="submit" class="submit-btn">Resmi Güncelle</button>
+        </form>
+    </div>
+
+    <div class="settings-header">Kullanıcı Adı ve Şifre Güncelleme</div>
+    <div class="form-section">
+        <form method="POST" action="{{ url_for('ayarlar') }}">
+            <input type="hidden" name="action" value="update_profile">
+            
+            <div class="input-group">
+                <label for="username">Kullanıcı Adı</label>
+                <input type="text" id="username" name="username" value="{{ current_user.username }}" required>
+            </div>
+
+            <hr style="border-color: #555; margin: 20px 0;">
+            
+            <h6 class="mt-4 mb-3" style="color: #bbb;">Şifre Değiştirme Alanı (Değiştirmek istemiyorsanız boş bırakın)</h6>
+
+            <div class="input-group">
+                <label for="current_password">Mevcut Şifreniz (Gereklidir)</label>
+                <input type="password" id="current_password" name="current_password" placeholder="Şifre değiştirmek için girin">
+            </div>
+
+            <div class="input-group">
+                <label for="new_password">Yeni Şifre</label>
+                <input type="password" id="new_password" name="new_password" placeholder="Yeni şifreniz">
+            </div>
+
+            <div class="input-group">
+                <label for="confirm_password">Yeni Şifre Tekrar</label>
+                <input type="password" id="confirm_password" name="confirm_password" placeholder="Yeni şifrenizi tekrar girin">
+            </div>
+            
+            <button type="submit" class="submit-btn">Profil/Şifreyi Kaydet</button>
+        </form>
+    </div>
+    
+    </div>
+{% endblock %}

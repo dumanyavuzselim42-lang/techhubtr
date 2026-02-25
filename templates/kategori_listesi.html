@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category_name }} Dersleri | TechHubTR</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    
+    <style>
+        .list-container {
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: var(--kod-kutu-bg);
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 189, 212, 0.4);
+        }
+        .list-item {
+            border-bottom: 1px solid #444;
+            padding: 15px 0;
+            transition: background-color 0.3s;
+        }
+        .list-item:hover {
+            background-color: #333;
+        }
+        .list-item h3 a {
+            color: var(--vurgu-renk);
+            text-decoration: none;
+            font-size: 1.5em;
+        }
+        .list-item p {
+            color: #ccc;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<header class="navbar">
+    <a href="{{ url_for('index') }}" class="logo-container">
+        <span class="logo-text">TechHubTR</span>
+        <img src="{{ url_for('static', filename='images/techhubtr-logo.png') }}" alt="TechHubTR Resmi Logosu" class="site-logo">
+    </a>
+    
+    <nav>
+        <a href="{{ url_for('index') }}" class="nav-link">Ana Sayfa</a>
+        <a href="{{ url_for('egitim') }}" class="nav-link">Eğitim</a>
+        <a href="{{ url_for('gomulu') }}" class="nav-link">Gömülü Sistemler</a>
+        <a href="{{ url_for('topluluk') }}" class="nav-link">Forum</a>
+        
+        <form action="{{ url_for('arama') }}" method="GET" style="display: inline-block; margin-right: 20px;">
+            <input type="text" name="q" placeholder="Ara..." required style="padding: 5px; border-radius: 3px; border: 1px solid #555; background-color: #333; color: white;">
+        </form>
+        
+        <a href="{{ url_for('iletisim') }}" class="nav-link" style="margin-left: auto;">İletişim</a> 
+        
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('bildirimler') }}" class="nav-link" style="position: relative; margin-right: 15px;">
+                <i class="fas fa-bell"></i> 
+                {% if unread_notifications_count > 0 %}
+                    <span style="position: absolute; top: 0; right: -5px; 
+                                 background-color: red; color: white; 
+                                 border-radius: 50%; padding: 2px 6px; 
+                                 font-size: 10px; line-height: 1;">
+                        {{ unread_notifications_count }}
+                    </span>
+                {% endif %}
+            </a>
+             
+            <a href="{{ url_for('ayarlar') }}" class="nav-link">Ayarlar</a> 
+            <a href="{{ url_for('profil') }}" class="nav-link">Profil</a>
+            <a href="{{ url_for('cikis') }}" class="nav-link">Çıkış Yap</a>
+        {% else %}
+            <a href="{{ url_for('giris') }}" class="nav-link">Giriş Yap</a>
+            <a href="{{ url_for('kayit') }}" class="nav-link">Kayıt Ol</a>
+        {% endif %}
+    </nav>
+</header>
+<!-- KRİTİK: Flash Mesaj Alanı Navbar'dan hemen sonra yerleştirildi -->
+<div class="flash-messages-container" style="max-width: 900px; margin: 20px auto;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message flash-{{ category }}" 
+                     style="padding: 12px; margin-bottom: 10px; border-radius: 6px; 
+                            background-color: {% if category == 'success' %}#27ae60{% elif category == 'danger' %}#e74c3c{% else %}#00bcd4{% endif %}; 
+                            color: white; text-align: center; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+<!-- FLASH MESAJ ALANI SONU -->
+    <main>
+        <div class="list-container">
+            <h2 class="profile-header">{{ category_name }} Dersleri</h2>
+            
+            {% if lessons %}
+                {% for lesson in lessons %}
+                    <div class="list-item">
+                        <h3><a href="{{ url_for('ders_detay', slug=lesson.slug) }}">{{ lesson.title }}</a></h3>
+                        <p>Yayın Tarihi: {{ lesson.created_at.strftime('%d %b %Y') }}</p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="text-align: center; color: #aaa;">Bu kategoride henüz ders bulunmamaktadır.</p>
+            {% endif %}
+            
+            <a href="{{ url_for('egitim') }}" class="cta-button" style="margin-top: 30px;">Tüm Kategorilere Dön</a>
+        </div>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 TechHubTR. Tüm Hakları Saklıdır.</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</body>
+</html>

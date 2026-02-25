@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{{ lesson.title }}{% endblock %}
+
+{% block body_class %}{% if lesson.sub_category == 'Siber Güvenlik' %}cyber-bg{% endif %}{% endblock %}
+
+{% block content %}
+<div class="lesson-container">
+    
+    <h1 class="lesson-title">{{ lesson.title }}</h1>
+    
+    <div class="lesson-meta">
+        <span class="alt-konu-etiketi">{{ lesson.sub_category }}</span> 
+        <span style="margin-left: 15px;">Seviye: <strong>{{ lesson.level }}</strong></span>
+        <span style="margin-left: 15px;">Modül Sayısı: <strong>{{ lesson.lesson_count }}</strong></span>
+        
+        <p style="margin-top: 10px; opacity: 0.8;">
+            Kısa Açıklama: {{ lesson.description }}
+        </p>
+    </div>
+    
+    <!-- KRİTİK ÇÖZÜM: HTML'e çevrilmiş içeriği çağırıyoruz. -->
+    <div class="lesson-content">
+        {{ lesson.html_content | safe }} 
+    </div>
+    
+    <a href="{{ url_for('egitim') }}" class="cta-button" style="margin-top: 30px;">Tüm Derslere Dön</a>
+    
+</div>
+{% endblock %}
+
+<!-- JS kodları, highlight.js'i çalıştırmak için base.html'den sonra buraya eklenmeli -->
+{% block scripts_extra %}
+<script>
+    // Ders içeriği yüklendikten sonra highlight.js'i tekrar çalıştırıyoruz.
+    if (typeof hljs !== 'undefined') {
+        hljs.highlightAll();
+    }
+</script>
+{% endblock scripts_extra %}

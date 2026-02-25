@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block body_class %}anasayfa-bg{% endblock %}
+
+{% block title %}Türkiye'nin Kodlama ve Teknoloji Merkezi{% endblock %}
+
+{% block content %}
+    <section class="hero-section">
+        <h1 class="hero-title">Türkiye'nin Kodlama ve Teknoloji Merkezi</h1>
+        <p class="hero-slogan">Python, C++, Siber Güvenlik ve Gömülü Sistemler Rehberleri.</p>
+        
+        <div class="code-terminal">
+            <pre><code class="language-python" id="animated-code"></code></pre>
+        </div>
+        
+        <!-- KRİTİK DÜZELTME: href="{{ url_for('egitim') }}" kullanılarak 
+             Flask'ın 'egitim' adlı rotasına (yani /egitim sayfasına) yönlendirme yapılıyor. -->
+        <a href="{{ url_for('egitim') }}" class="cta-button">Hemen Öğrenmeye Başla</a>
+    </section>
+    
+{% endblock %}

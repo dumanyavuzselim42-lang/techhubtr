@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Yeni Şifre Belirle{% endblock %}
+
+{% block content %}
+<div class="auth-container" style="max-width: 400px; margin: 80px auto; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);">
+    <h2 style="color: var(--vurgu-renk); text-align: center; margin-bottom: 20px;">Yeni Şifre Belirle</h2>
+    <p style="text-align: center; color: var(--ikinci-yazi-renk); margin-bottom: 30px;">Lütfen hesabınız için yeni bir şifre belirleyin.</p>
+    
+    <form method="POST" action="{{ url_for('sifre_sifirla', token=token) }}"> 
+        
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label for="new_password" style="display: block; margin-bottom: 8px; font-weight: bold;">Yeni Şifre:</label>
+            <input type="password" id="new_password" name="new_password" required 
+                   style="width: 100%; padding: 12px; background-color: var(--input-bg); color: var(--yazi-renk); border: 1px solid var(--border-renk); border-radius: 6px; box-sizing: border-box;" 
+                   minlength="6">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label for="confirm_password" style="display: block; margin-bottom: 8px; font-weight: bold;">Yeni Şifre (Tekrar):</label>
+            <input type="password" id="confirm_password" name="confirm_password" required 
+                   style="width: 100%; padding: 12px; background-color: var(--input-bg); color: var(--yazi-renk); border: 1px solid var(--border-renk); border-radius: 6px; box-sizing: border-box;">
+        </div>
+        
+        <button type="submit" class="cta-button" 
+                style="width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background-color 0.3s;">
+            Şifreyi Sıfırla
+        </button>
+    </form>
+</div>
+{% endblock %}

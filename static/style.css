@@ -1,0 +1,614 @@
+/* --- Global ve Koyu Tema Ayarları --- */
+:root {
+    --arka-alan: #0f1118; 
+    --yazi-renk: #E0E0E0; 
+    --vurgu-renk: #00bcd4; 
+    --kod-kutu-bg: #1c1f2b; 
+    --icerik-kart-bg: #222633; 
+    --ana-golge: rgba(0, 0, 0, 0.4);
+    --neon-golge: 0 0 10px rgba(0, 188, 212, 0.5); 
+}
+
+body {
+    background-color: var(--arka-alan); 
+    color: var(--yazi-renk);
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    min-height: 100vh; 
+    background-attachment: fixed; 
+    overflow-x: hidden;
+}
+
+/* 1. KISIM: Sadece Ana Sayfa için orijinal (Filigranlı) görseli yükler (Index.html) */
+body.anasayfa-bg {
+    background-image: url('../static/main_bg.jpg'), 
+                        radial-gradient(circle at center, #1b1e28 1px, transparent 1px); 
+    background-size: cover, 50px 50px; 
+    background-position: center center, 0 0; 
+    background-repeat: no-repeat, repeat; 
+}
+
+/* 2. KISIM: Ana Sayfa DIŞINDAKİ (Kategori vb.) sayfalar için TEMİZ görseli yükler */
+body:not(.anasayfa-bg) { 
+    background-image: url('../static/kategori_bg.png'), 
+                        radial-gradient(circle at center, #1b1e28 1px, transparent 1px); 
+    background-size: cover, 50px 50px; 
+    background-position: center center, 0 0; 
+    background-repeat: no-repeat, repeat; 
+}
+
+/* --- HAREKETLİ MATRİKS EFEKTİ (Tüm Sayfalara Uygulandı) --- */
+body::before { 
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        repeating-linear-gradient(
+            to bottom,
+            rgba(0, 255, 65, 0.05), 
+            rgba(0, 255, 65, 0.02) 1px,
+            transparent 1px,
+            transparent 100px
+        );
+    background-size: 100% 100px;
+    animation: matrix-scroll 20s linear infinite; 
+    z-index: -1; 
+    opacity: 0.2; 
+}
+
+/* KRİTİK ÇÖZÜM: Matrix efektini ve içindeki her şeyi kategori sayfalarından kaldırır */
+body:not(.anasayfa-bg)::before {
+    content: none !important; 
+    background: none !important;
+    opacity: 0;
+}
+
+@keyframes matrix-scroll {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(-100px); 
+    }
+}
+
+/* Siber Güvenlik Sayfası İçin Ekstra Stil */
+.cyber-bg .lesson-container {
+    background-color: rgba(17, 34, 51, 0.9);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+    color: #00ff41;
+}
+.cyber-bg .lesson-title {
+    border-bottom-color: #00ff41;
+}
+
+/* --- Navbar Stili --- */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center; 
+    padding: 15px 50px;
+    background-color: #282c34; 
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* --- LOGO YERLEŞİM STİLLERİ --- */
+
+.logo-container {
+    display: flex;     
+    align-items: center;     
+    text-decoration: none; 
+    color: var(--vurgu-renk); 
+    font-weight: bold;
+    font-size: 1.8em;     
+    margin-right: 20px;      
+}
+
+.logo-text {
+    color: var(--vurgu-renk);
+}
+
+.site-logo {
+    width: 30px;         
+    height: auto;
+    margin-left: 8px;    
+    display: block; 
+}
+
+.nav-link {
+    color: var(--yazi-renk);
+    text-decoration: none;
+    margin-left: 30px;
+    transition: color 0.3s;
+}
+.nav-link:hover {
+    color: var(--vurgu-renk);
+}
+
+/* --- Hero Section Stili --- */
+.hero-section {
+    text-align: center;
+    padding: 100px 20px;
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.hero-title {
+    font-size: 3em;
+    margin-bottom: 10px;
+    color: var(--vurgu-renk);
+}
+.hero-slogan {
+    font-size: 1.2em;
+    opacity: 0.8;
+    margin-bottom: 40px;
+}
+
+/* --- Kod Terminal Stili --- */
+.code-terminal {
+    width: 90%;
+    max-width: 700px;
+    margin-bottom: 40px;
+    background-color: var(--kod-kutu-bg);
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 189, 212, 0.4); 
+    overflow: hidden;
+    text-align: left;
+    padding: 15px;
+}
+.code-terminal pre {
+    margin: 0;
+    padding: 0;
+}
+.code-terminal code {
+    white-space: pre-wrap;
+    display: block;
+    color: #f8f8f2;
+    font-size: 0.9em;
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+
+/* --- CTA Butonu Stili --- */
+.cta-button {
+    background-color: var(--vurgu-renk);
+    color: var(--arka-alan);
+    padding: 12px 30px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background-color 0.3s, transform 0.3s;
+}
+.cta-button:hover {
+    background-color: #00a4b4;
+    transform: scale(1.05);
+}
+
+/* --- Kategori Kartları ve Paneller (GÖRSEL DERİNLİK) --- */
+
+/* Yönetim ve Auth Panelleri */
+.auth-container, .profile-container, .forum-container, .settings-container, .lesson-container, .topic-detail-container {
+    max-width: 900px; /* Merkezi konteynır genişliği */
+    margin: 50px auto;
+    padding: 30px;
+    background-color: var(--kod-kutu-bg); /* İkinci katman */
+    border-radius: 12px;
+    box-shadow: 0 5px 15px var(--ana-golge), 0 0 5px rgba(0, 188, 212, 0.3);
+}
+
+/* Eğitim/Gömülü Sistemler Kartları */
+.kategori-kart {
+    background-color: var(--icerik-kart-bg); 
+    padding: 20px;
+    border-radius: 12px; 
+    box-shadow: 0 8px 15px var(--ana-golge); 
+    border: 1px solid #333; 
+    transition: transform 0.3s ease-in-out;
+    text-align: center;
+    color: var(--yazi-renk) !important; 
+    text-decoration: none; 
+}
+
+/* Kart içindeki tüm metinlerin rengini korur ve çizgiden kurtarır */
+.kategori-kart p, 
+.kategori-kart span,
+.kategori-kart h3 {
+    color: var(--yazi-renk) !important; 
+    text-shadow: none; 
+    text-decoration: none;
+}
+
+.kategori-kart:hover {
+    transform: translateY(-3px); 
+    box-shadow: 0 10px 20px var(--ana-golge), var(--neon-golge); 
+    text-decoration: none; 
+}
+.kategori-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+    gap: 30px;
+    padding: 50px;
+    max-width: 1200px;
+    margin: auto;
+}
+
+/* --- FORUM VE DERS DETAY POST KARTLARI --- */
+.post-card {
+    background-color: var(--icerik-kart-bg); 
+    border-radius: 8px; 
+    margin-bottom: 20px;
+    display: flex;
+    border: 1px solid #2e343d; 
+    box-shadow: 0 3px 8px var(--ana-golge);
+    overflow: hidden;
+}
+
+.post-user-info {
+    width: 180px; 
+    background-color: var(--kod-kutu-bg); 
+    padding: 15px;
+    text-align: center;
+    border-right: 1px solid #333;
+}
+.post-user-info .username {
+    color: var(--vurgu-renk);
+}
+.post-content-wrap {
+    flex-grow: 1; 
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.post-header-meta {
+    font-size: 0.8em;
+    color: #aaa;
+}
+
+/* Yorum Listesi Arka Planı (Forum Anasayfa) */
+.topic-list-container {
+    background-color: var(--kod-kutu-bg); 
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px var(--ana-golge);
+}
+
+/* Ders Yönetim Listesi Stilleri */
+.list-item-management {
+    border-bottom: 1px solid #333;
+    padding: 10px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- FOOTER DÜZELTMESİ --- */
+footer {
+    padding: 20px 50px; 
+    text-align: left;     
+    width: 100%;          
+    background-color: #282c34; 
+    box-sizing: border-box; 
+    color: var(--yazi-renk); 
+    position: relative; 
+    z-index: 50; 
+}
+
+.site-footer {
+    margin: 0;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+/* **************************************** */
+/* --- AYARLAR SAYFASI İÇİN EK KODLAR --- */
+/* **************************************** */
+
+/* Ayarlar Konteynerinin Genel Düzeni */
+.settings-container {
+    max-width: 700px; 
+    margin: 50px auto;
+    padding: 0;
+    background-color: transparent; 
+    box-shadow: none; 
+}
+
+/* Ayar Bölüm Başlıkları (Gri/Koyu Başlıklar) */
+.settings-header {
+    background-color: #333946; 
+    color: var(--yazi-renk);
+    padding: 15px 25px;
+    border-radius: 8px 8px 0 0; 
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-top: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Form Alanını Kapsayan Bölüm */
+.form-section {
+    padding: 30px 25px;
+    background-color: var(--kod-kutu-bg); 
+    border-radius: 0 0 8px 8px; 
+    box-shadow: 0 5px 15px var(--ana-golge);
+    border: 1px solid #2e343d;
+    margin-bottom: 30px;
+}
+
+/* Tüm Form Etiketleri */
+.input-group label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #bbb; 
+}
+
+/* Text, Password ve Select Alanları */
+.input-group input[type="text"],
+.input-group input[type="password"],
+.input-group input[type="file"],
+.input-group select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #555;
+    background-color: #282c34; 
+    color: var(--yazi-renk);
+    border-radius: 4px;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+
+/* Input Fokuslandığında Renk Değişimi */
+.input-group input:focus,
+.input-group select:focus {
+    border-color: var(--vurgu-renk);
+    outline: none;
+}
+
+/* Profil Resmi Stili */
+.profile-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin: 10px auto 20px auto;
+    display: block;
+    border: 3px solid var(--vurgu-renk);
+    box-shadow: 0 0 15px rgba(0, 189, 212, 0.4); 
+}
+
+/* Genel Kaydetme Butonu Stili */
+.submit-btn {
+    background-color: #2ecc71; 
+    color: var(--arka-alan);
+    padding: 12px 30px;
+    text-decoration: none;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+    margin-top: 20px;
+}
+.submit-btn:hover {
+    background-color: #27ae60;
+    transform: scale(1.02);
+}
+
+/* --- Placeholder Animasyonu --- */
+@keyframes pulse-placeholder {
+    0% { opacity: 0.5; }   
+    50% { opacity: 1; }   
+    100% { opacity: 0.5; } 
+}
+
+/* Tüm input ve textarea'lardaki placeholder'ı hedefle */
+.input-group input::placeholder,
+.input-group textarea::placeholder {
+    animation: pulse-placeholder 3s infinite;
+    -webkit-animation: pulse-placeholder 3s infinite;
+}
+
+/* **************************************** */
+/* --- SONSuz KAYAN YAZI (MARQUEE) STİLLERİ --- */
+/* **************************************** */
+
+.scrolling-text-wrapper {
+    width: 100%;
+    overflow: hidden; 
+    white-space: nowrap; 
+    background-color: #1a1e27; 
+    padding: 8px 0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    margin-bottom: 20px; 
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
+    box-sizing: border-box; 
+}
+
+.scrolling-text-content {
+    display: inline-block; 
+    padding-left: 100%; 
+    color: #00ff41; 
+    font-weight: 500;
+    animation: marquee 25s linear infinite; 
+}
+
+/* Animasyon Tanımı: Metni sonsuza kadar sola kaydırır */
+@keyframes marquee {
+    0% {
+        transform: translate(0, 0); 
+    }
+    100% {
+        transform: translate(-100%, 0); 
+    }
+}
+
+/* Hover'da durdurma (Opsiyonel) */
+.scrolling-text-wrapper:hover .scrolling-text-content {
+    animation-play-state: paused;
+}
+
+
+/* **************************************** */
+/* --- LIGHT MODE STİLLERİ (Artık kullanılmasa da korunuyor) --- */
+/* **************************************** */
+
+.light-mode {
+    --arka-alan: #F0F0F0; 
+    --yazi-renk: #333333; 
+    --vurgu-renk: #007bff; 
+    --kod-kutu-bg: #FFFFFF; 
+    --icerik-kart-bg: #FFFFFF; 
+    --ana-golge: rgba(0, 0, 0, 0.2);
+    --neon-golge: none; 
+    background-image: none;
+}
+
+/* Light Mode'da navbar ve kod kutularını düzeltme */
+.light-mode .navbar {
+    background-color: #f8f8f8;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.light-mode .code-terminal,
+.light-mode .auth-container,
+.light-mode .profile-container,
+.light-mode .lesson-container,
+.light-mode .topic-detail-container {
+    background-color: var(--icerik-kart-bg);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    border: 1px solid #ddd;
+}
+.light-mode .input-group input,
+.light-mode .comment-form textarea {
+    background-color: #f8f8f8;
+    color: #333;
+    border-color: #ddd;
+}
+
+/* Light Mode'da CTA butonlarını düzeltme */
+.light-mode .cta-button,
+.light-mode .submit-btn {
+    background-color: var(--vurgu-renk);
+    color: white !important;
+}
+
+/* Light Mode'da Forum kartlarını düzeltme */
+.light-mode .topic-list-container,
+.light-mode .post-card {
+    background-color: #f4f4f4;
+    border-color: #ddd;
+}
+.light-mode .post-user-info {
+    background-color: #f0f0f0;
+    border-right-color: #ddd;
+}
+
+
+@media (max-width: 768px) {
+    /* 768 piksel ve altı için kurallar */
+
+    /* 1. Navbar Düzenlemesi: Yatay Kalmaya Zorla ve Sıkıştır */
+    .navbar {
+        flex-direction: row; 
+        flex-wrap: wrap; 
+        padding: 15px 10px; 
+        justify-content: space-between; 
+    }
+    
+    .navbar a:first-child { 
+        margin-bottom: 0;
+    }
+
+    /* Ana Navigasyon ve Auth Linkleri (TÜM LİNKLERİN GRUBU) */
+    .navbar nav {
+        display: flex; 
+        flex-direction: row; 
+        width: auto;
+        text-align: left;
+        order: 2; 
+        flex-wrap: wrap; 
+        justify-content: flex-end; 
+        margin-top: 0; 
+        
+        /* KRİTİK: Kalan tüm alanı kapla, linklerin sıkışmasını sağla */
+        flex-grow: 1; 
+        flex-shrink: 1;
+        min-width: 0; 
+    }
+    
+    .nav-link {
+        /* Linkler arası boşluklar MUTLAK SIFIRLANDI */
+        margin: 0; 
+        padding: 5px 4px; 
+        display: block; 
+        font-size: 0.8em; 
+        white-space: nowrap; 
+    }
+    
+    /* Arama çubuğunu telefonda tam genişlik yap ve alt satıra at */
+    .navbar form {
+        display: block !important; 
+        width: 100%;
+        margin: 10px 0 0 0 !important; 
+        order: 3; 
+    }
+    .navbar form input {
+        width: 100% !important;
+        box-sizing: border-box; 
+    }
+
+    /* 2. Kategori Grid Düzenlemesi: Tek sütun (Değişmedi) */
+    .kategori-grid {
+        grid-template-columns: 1fr; 
+        padding: 20px; 
+        gap: 20px;
+    }
+    
+    /* 3. Post Kartları (Forum) Düzenlemesi: Alt alta yığıl (Değişmedi) */
+    .post-card {
+        flex-direction: column; 
+    }
+    .post-user-info {
+        width: auto; 
+        border-right: none;
+        border-bottom: 1px solid #333;
+    }
+
+    /* 4. Genel Konteyner Boşlukları (Değişmedi) */
+    .auth-container, .profile-container, .forum-container, .settings-container, .lesson-container, .topic-detail-container {
+        margin: 20px 10px; 
+        padding: 20px;
+    }
+
+    /* 5. Hero Section (Ana Sayfa) (Değişmedi) */
+    .hero-section {
+        padding: 50px 10px;
+    }
+    .hero-title {
+        font-size: 2em; 
+    }
+    .hero-slogan {
+        font-size: 1em;
+    }
+
+    /* 6. KRİTİK DÜZELTME: Mobil Hata nedeniyle AI butonunu görünmez yap ve devre dışı bırak */
+    .chat-fab-button {
+        /* Display: none'dan daha agresif bir yöntem: */
+        visibility: hidden !important; 
+        pointer-events: none !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+}

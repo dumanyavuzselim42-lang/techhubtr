@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destek ve İletişim | TechHubTR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/> 
+</head>
+<body class="{% if current_user.is_authenticated and current_user.theme == 'light' %}light-mode{% endif %}">
+    
+<header class="navbar">
+    <a href="{{ url_for('index') }}" class="logo-container">
+        <span class="logo-text">TechHubTR</span>
+        <img src="{{ url_for('static', filename='images/techhubtr-logo.png') }}" alt="TechHubTR Resmi Logosu" class="site-logo">
+    </a>
+    
+    <nav>
+        <a href="{{ url_for('index') }}" class="nav-link">Ana Sayfa</a>
+        <a href="{{ url_for('egitim') }}" class="nav-link">Eğitim</a>
+        <a href="{{ url_for('gomulu') }}" class="nav-link">Gömülü Sistemler</a>
+        <a href="{{ url_for('topluluk') }}" class="nav-link">Forum</a>
+        
+        <form action="{{ url_for('arama') }}" method="GET" style="display: inline-block; margin-right: 20px;">
+            <input type="text" name="q" placeholder="Ara..." required style="padding: 5px; border-radius: 3px; border: 1px solid #555; background-color: #333; color: white;">
+        </form>
+        
+        <a href="{{ url_for('iletisim') }}" class="nav-link" style="margin-left: auto;">İletişim</a> 
+        
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('bildirimler') }}" class="nav-link" style="position: relative; margin-right: 15px;">
+                <i class="fas fa-bell"></i> 
+                {% if unread_notifications_count > 0 %}
+                    <span style="position: absolute; top: 0; right: -5px; 
+                                 background-color: red; color: white; 
+                                 border-radius: 50%; padding: 2px 6px; 
+                                 font-size: 10px; line-height: 1;">
+                        {{ unread_notifications_count }}
+                    </span>
+                {% endif %}
+            </a>
+            
+            <a href="{{ url_for('ayarlar') }}" class="nav-link">Ayarlar</a> 
+            <a href="{{ url_for('profil') }}" class="nav-link">Profil</a>
+            <a href="{{ url_for('cikis') }}" class="nav-link">Çıkış Yap</a>
+        {% else %}
+            <a href="{{ url_for('giris') }}" class="nav-link">Giriş Yap</a>
+            <a href="{{ url_for('kayit') }}" class="nav-link">Kayıt Ol</a>
+        {% endif %}
+    </nav>
+</header>
+ 
+    <div class="flash-messages-container" style="max-width: 900px; margin: 20px auto;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}" 
+                         style="padding: 12px; margin-bottom: 10px; border-radius: 6px; 
+                                background-color: {% if category == 'success' %}#27ae60{% elif category == 'danger' %}#e74c3c{% else %}#00bcd4{% endif %}; 
+                                color: white; text-align: center; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <main>
+        <div class="settings-container" style="max-width: 600px;">
+            <h2>Destek ve İletişim</h2>
+            <p style="margin-bottom: 20px;">Hata bildirimleri, işbirliği teklifleri ve sorularınız için lütfen aşağıdaki formu kullanın.</p>
+
+            <form method="POST" action="{{ url_for('iletisim') }}">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="name">Adınız:</label>
+                    <input type="text" name="name" required style="width: 100%; padding: 10px; border: 1px solid #444; background-color: #333; color: var(--yazi-renk); border-radius: 4px; box-sizing: border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="email">E-posta Adresiniz:</label>
+                    <input type="email" name="email" required style="width: 100%; padding: 10px; border: 1px solid #444; background-color: #333; color: var(--yazi-renk); border-radius: 4px; box-sizing: border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="message">Mesajınız:</label>
+                    <textarea name="message" required style="width: 100%; min-height: 150px; background-color: #333; color: var(--yazi-renk); border-radius: 4px; border: 1px solid #444; padding: 10px;"></textarea>
+                </div>
+                
+                <button type="submit" class="submit-btn" style="background-color: var(--vurgu-renk); color: var(--arka-plan); padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Mesajı Gönder</button>
+            </form>
+        </div>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 TechHubTR. Tüm Hakları Saklıdır.</p>
+    </footer>
+</body>
+</html>

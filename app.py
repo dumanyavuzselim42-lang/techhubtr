@@ -3,7 +3,7 @@ import secrets
 import datetime
 from functools import wraps
 
-from flask import Flask, render_template, redirect, url_for, request, flash, abort
+from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 )
@@ -25,7 +25,7 @@ DB_PATH = os.path.join(BASE_DIR, "techhubtr_users.db")
 
 app = Flask(__name__)
 
-# Gizli anahtar (ENV önerilir)
+# Secret key (Render'da ENV ile ver)
 app.secret_key = os.getenv("SECRET_KEY", "dev-only-change-me")
 
 # Upload ayarları
@@ -33,17 +33,27 @@ app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "static", "avatars")
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1MB
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
-# DB
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+# =========================
+# DATABASE (Render: Postgres, Local: SQLite fallback)
+# =========================
+db_url = os.getenv("DATABASE_URL")
+
+# Render bazen postgres:// verir, SQLAlchemy postgresql:// bekler
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url or f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Mail (Gmail SSL 465)
+# =========================
+# MAIL (Gmail SSL 465)
+# =========================
 app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
 app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", "465"))
 app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS", "false").lower() == "true"
 app.config["MAIL_USE_SSL"] = os.getenv("MAIL_USE_SSL", "true").lower() == "true"
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")  # örn: techhubtr@gmail.com
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")  # 16 haneli app password
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
 app.config["MAIL_DEFAULT_SENDER"] = os.getenv(
     "MAIL_DEFAULT_SENDER",
     "TechHubTR Destek <techhubtr@gmail.com>"
@@ -86,6 +96,7 @@ def admin_required(f):
 
 
 def send_verification_email(to_email: str, token: str):
+    # Mail ayarı yoksa sessizce geç
     if not app.config["MAIL_USERNAME"] or not app.config["MAIL_PASSWORD"]:
         print("MAIL ayarları eksik, doğrulama maili gönderilemedi.")
         return
@@ -232,7 +243,6 @@ class Topic(db.Model):
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-
     content = db.Column(db.Text, nullable=False)
 
     topic_id = db.Column(db.Integer, db.ForeignKey("topic.id"), nullable=False)
@@ -494,7 +504,6 @@ def bildirimler():
         .order_by(Notification.timestamp.desc())
         .all()
     )
-    # otomatik okundu
     changed = False
     for n in notifications:
         if not n.is_read:
@@ -703,7 +712,6 @@ def konu_detay(topic_id):
 
             current_user.update_points_and_rank(5)
 
-            # Bildirim: konu sahibine
             topic_creator = topic.author
             if topic_creator and topic_creator.id != current_user.id:
                 msg = f"'{topic.title}' başlıklı konunuza yeni cevap geldi."
@@ -891,12 +899,10 @@ def ayarlar():
                 flash("Dosya seçilmedi.", "danger")
                 return redirect(url_for("ayarlar"))
 
-            # Uzantı kontrolü
             if not allowed_file(file.filename):
                 flash("Geçersiz dosya türü. Sadece PNG, JPG, JPEG, GIF desteklenir (Max 1MB).", "danger")
                 return redirect(url_for("ayarlar"))
 
-            # Güvenli isim (biz zaten user_id ile isimliyoruz)
             filename = secure_filename(file.filename)
             ext = filename.rsplit(".", 1)[1].lower()
 
@@ -940,18 +946,30 @@ def init_db_and_admin():
         db.session.add(admin)
         db.session.commit()
     else:
-        # varsa ve doğrulanmamışsa düzelt
         if not admin_user.is_verified:
             admin_user.is_verified = True
             db.session.commit()
 
 
 # =========================
-# MAIN
+# BOOTSTRAP (Gunicorn/Render)
+# =========================
+# Gunicorn app:app ile import edince __main__ çalışmaz. O yüzden burada init ediyoruz.
+try:
+    ensure_folders()
+    with app.app_context():
+        init_db_and_admin()
+except Exception as e:
+    print("BOOTSTRAP ERROR:", type(e).__name__, e)
+
+
+# =========================
+# MAIN (Local dev)
 # =========================
 if __name__ == "__main__":
     ensure_folders()
     with app.app_context():
         init_db_and_admin()
 
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=True)
+    # Localde istersen debug aç, Render'da zaten gunicorn kullanılıyor
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))

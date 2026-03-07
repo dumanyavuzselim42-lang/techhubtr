@@ -1,19 +1,22 @@
 import os
+import json
 import secrets
 import datetime
+import smtplib
+import socket
 from functools import wraps
+from email.mime.text import MIMEText
 
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 )
 from flask_sqlalchemy import SQLAlchemy
-from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from sqlalchemy import or_, func as sqla_func
 from sqlalchemy.orm import joinedload
-
 import markdown
 
 
@@ -21,50 +24,63 @@ import markdown
 # APP + CONFIG
 # =========================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.path.join(BASE_DIR, "techhubtr_users.db")
+SQLITE_DB_PATH = os.path.join(BASE_DIR, "techhubtr_users.db")
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-# Secret key (Render'da ENV ile ver)
 app.secret_key = os.getenv("SECRET_KEY", "dev-only-change-me")
 
-# Upload ayarları
 app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "static", "avatars")
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1MB
+
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
+# Cookie güvenliği
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 # =========================
-# DATABASE (Render: Postgres, Local: SQLite fallback)
+# DATABASE
+# Render: PostgreSQL
+# Local: SQLite fallback
 # =========================
 db_url = os.getenv("DATABASE_URL")
 
-# Render bazen postgres:// verir, SQLAlchemy postgresql:// bekler
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url or f"sqlite:///{DB_PATH}"
+# Render'da SQLite'a yanlışlıkla düşmesin istersen bunu true yap
+require_database_url = os.getenv("REQUIRE_DATABASE_URL", "false").lower() == "true"
+if require_database_url and not db_url:
+    raise RuntimeError("DATABASE_URL zorunlu ama bulunamadı.")
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url or f"sqlite:///{SQLITE_DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # =========================
-# MAIL (Gmail SSL 465)
+# MAIL / SMTP
 # =========================
-app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
-app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", "465"))
-app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS", "false").lower() == "true"
-app.config["MAIL_USE_SSL"] = os.getenv("MAIL_USE_SSL", "true").lower() == "true"
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = os.getenv(
-    "MAIL_DEFAULT_SENDER",
-    "TechHubTR Destek <techhubtr@gmail.com>"
-)
+MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "true").lower() == "true"
+MAIL_USE_SSL = os.getenv("MAIL_USE_SSL", "false").lower() == "true"
+MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "TechHubTR Destek <techhubtr@gmail.com>")
+SMTP_TIMEOUT_SECONDS = int(os.getenv("SMTP_TIMEOUT_SECONDS", "10"))
 
+# =========================
+# INIT EXTENSIONS
+# =========================
 db = SQLAlchemy(app)
-mail = Mail(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "giris"
+login_manager.login_message = "Bu sayfayı görüntülemek için giriş yapmalısınız."
+login_manager.login_message_category = "warning"
 
 
 # =========================
@@ -88,54 +104,80 @@ def generate_token() -> str:
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            flash("Bu sayfaya erişim yetkiniz yoktur!", "danger")
+        if not current_user.is_authenticated or not getattr(current_user, "is_admin", False):
+            flash("Bu sayfaya erişim yetkiniz yoktur.", "danger")
             return redirect(url_for("index"))
         return f(*args, **kwargs)
     return decorated
 
 
-def send_verification_email(to_email: str, token: str):
-    # Mail ayarı yoksa sessizce geç
-    if not app.config["MAIL_USERNAME"] or not app.config["MAIL_PASSWORD"]:
-        print("MAIL ayarları eksik, doğrulama maili gönderilemedi.")
-        return
+def send_email_safely(to_email: str, subject: str, body: str) -> bool:
+    """
+    Timeout'lu SMTP gönderim.
+    Mail başarısız olsa bile siteyi çökertmez.
+    """
+    if not MAIL_USERNAME or not MAIL_PASSWORD:
+        print("MAIL ENV eksik: MAIL_USERNAME veya MAIL_PASSWORD yok.")
+        return False
 
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = MAIL_DEFAULT_SENDER
+    msg["To"] = to_email
+
+    try:
+        if MAIL_USE_SSL:
+            server = smtplib.SMTP_SSL(MAIL_SERVER, MAIL_PORT, timeout=SMTP_TIMEOUT_SECONDS)
+        else:
+            server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=SMTP_TIMEOUT_SECONDS)
+
+        with server:
+            server.ehlo()
+            if MAIL_USE_TLS and not MAIL_USE_SSL:
+                server.starttls()
+                server.ehlo()
+
+            server.login(MAIL_USERNAME, MAIL_PASSWORD)
+            server.sendmail(MAIL_USERNAME, [to_email], msg.as_string())
+
+        return True
+
+    except (socket.timeout, TimeoutError) as e:
+        print("SMTP TIMEOUT:", type(e).__name__, e)
+        return False
+    except Exception as e:
+        print("SMTP ERROR:", type(e).__name__, e)
+        return False
+
+
+def send_verification_email(to_email: str, token: str) -> bool:
     verification_url = url_for("verify_email", token=token, _external=True)
-    msg = Message("TechHubTR: Hesabınızı Doğrulayın", recipients=[to_email])
-    msg.body = (
+    subject = "TechHubTR: Hesabınızı Doğrulayın"
+    body = (
         "Merhaba,\n\n"
         "TechHubTR hesabınızı aktifleştirmek için aşağıdaki linke tıklayınız:\n"
         f"{verification_url}\n"
     )
-    try:
-        mail.send(msg)
-        print(f"BİLGİ: Doğrulama e-postası {to_email} adresine gönderildi.")
-    except Exception as e:
-        print("--- KRİTİK E-POSTA HATASI (Doğrulama) ---")
-        print(f"{type(e).__name__}: {e}")
+    ok = send_email_safely(to_email, subject, body)
+    if ok:
+        print(f"MAIL OK: doğrulama -> {to_email}")
+    return ok
 
 
-def send_password_reset_email(to_email: str, username: str, token: str):
-    if not app.config["MAIL_USERNAME"] or not app.config["MAIL_PASSWORD"]:
-        print("MAIL ayarları eksik, şifre sıfırlama maili gönderilemedi.")
-        return
-
+def send_password_reset_email(to_email: str, username: str, token: str) -> bool:
     reset_url = url_for("sifre_sifirla", token=token, _external=True)
-    msg = Message("TechHubTR: Şifre Sıfırlama Talebi", recipients=[to_email])
-    msg.body = (
+    subject = "TechHubTR: Şifre Sıfırlama Talebi"
+    body = (
         f"Merhaba {username},\n\n"
         "Hesabınız için şifre sıfırlama talebinde bulundunuz.\n"
         "Yeni şifrenizi belirlemek için aşağıdaki linke tıklayın:\n"
         f"{reset_url}\n\n"
         "Bu link 1 saat geçerlidir.\n"
     )
-    try:
-        mail.send(msg)
-        print(f"BİLGİ: Şifre sıfırlama e-postası {to_email} adresine gönderildi.")
-    except Exception as e:
-        print("--- KRİTİK E-POSTA HATASI (Şifre Sıfırlama) ---")
-        print(f"{type(e).__name__}: {e}")
+    ok = send_email_safely(to_email, subject, body)
+    if ok:
+        print(f"MAIL OK: reset -> {to_email}")
+    return ok
 
 
 # =========================
@@ -165,15 +207,12 @@ class User(UserMixin, db.Model):
 
     avatar_filename = db.Column(db.String(128), default="default.png")
 
-    # Email doğrulama
     is_verified = db.Column(db.Boolean, default=False)
     email_verification_token = db.Column(db.String(100), unique=True, nullable=True)
 
-    # Şifre sıfırlama
     password_reset_token = db.Column(db.String(100), unique=True, nullable=True)
     password_reset_expires_at = db.Column(db.DateTime, nullable=True)
 
-    # ilişkiler
     topics = db.relationship("Topic", backref="author", lazy=True)
     comments = db.relationship("Comment", backref="commenter", lazy=True)
 
@@ -185,12 +224,14 @@ class User(UserMixin, db.Model):
 
     def get_total_posts(self) -> int:
         topic_count = (
-            db.session.execute(db.select(sqla_func.count(Topic.id)).filter(Topic.user_id == self.id)).scalar()
-            or 0
+            db.session.execute(
+                db.select(sqla_func.count(Topic.id)).filter(Topic.user_id == self.id)
+            ).scalar() or 0
         )
         comment_count = (
-            db.session.execute(db.select(sqla_func.count(Comment.id)).filter(Comment.user_id == self.id)).scalar()
-            or 0
+            db.session.execute(
+                db.select(sqla_func.count(Comment.id)).filter(Comment.user_id == self.id)
+            ).scalar() or 0
         )
         return int(topic_count + comment_count)
 
@@ -261,7 +302,6 @@ class Notification(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-
     topic_id = db.Column(db.Integer, db.ForeignKey("topic.id"), nullable=True)
 
     message = db.Column(db.String(256), nullable=False)
@@ -294,6 +334,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
+
 @app.route("/giris", methods=["GET", "POST"])
 def giris():
     if current_user.is_authenticated:
@@ -311,7 +356,7 @@ def giris():
                 return redirect(url_for("giris"))
 
             login_user(user)
-            flash("Başarıyla giriş yaptınız!", "success")
+            flash("Başarıyla giriş yaptınız.", "success")
             return redirect(url_for("profil"))
 
         flash("Geçersiz e-posta veya şifre.", "danger")
@@ -361,7 +406,8 @@ def kayit():
         db.session.commit()
 
         send_verification_email(new_user.email, token)
-        flash("Kayıt başarılı! Lütfen gelen kutunuzdaki doğrulama linkine tıklayınız.", "success")
+
+        flash("Kayıt başarılı. Doğrulama e-postası gönderildi. Spam/Junk klasörünü de kontrol edin.", "success")
         return redirect(url_for("giris"))
 
     return render_template("kayit.html")
@@ -377,7 +423,7 @@ def verify_email(token):
         user.is_verified = True
         user.email_verification_token = None
         db.session.commit()
-        flash("E-posta adresiniz başarıyla doğrulandı! Giriş yapabilirsiniz.", "success")
+        flash("E-posta adresiniz başarıyla doğrulandı. Giriş yapabilirsiniz.", "success")
         return redirect(url_for("giris"))
 
     flash("Geçersiz veya süresi dolmuş doğrulama linki.", "danger")
@@ -393,7 +439,6 @@ def sifremi_unuttum():
         email = (request.form.get("email") or "").strip().lower()
         user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
 
-        # Güvenlik: mail var/yok bilgisini sızdırma
         if user:
             token = generate_token()
             user.password_reset_token = token
@@ -402,7 +447,7 @@ def sifremi_unuttum():
 
             send_password_reset_email(user.email, user.username, token)
 
-        flash("Şifre sıfırlama linki e-posta adresinize gönderildi. Lütfen kontrol edin.", "success")
+        flash("Şifre sıfırlama linki e-posta adresinize gönderildi. Spam/Junk klasörünü de kontrol edin.", "success")
         return redirect(url_for("giris"))
 
     return render_template("sifremi_unuttum.html")
@@ -413,16 +458,19 @@ def sifre_sifirla(token):
     if current_user.is_authenticated:
         return redirect(url_for("profil"))
 
-    user = db.session.execute(db.select(User).filter_by(password_reset_token=token)).scalar_one_or_none()
+    user = db.session.execute(
+        db.select(User).filter_by(password_reset_token=token)
+    ).scalar_one_or_none()
 
     now = datetime.datetime.now()
-    is_expired = (
-        (user is None)
-        or (user.password_reset_expires_at is None)
-        or (user.password_reset_expires_at < now)
+    expired = (
+        user is None
+        or user.password_reset_expires_at is None
+        or user.password_reset_expires_at < now
     )
-    if is_expired:
-        flash("Geçersiz veya süresi dolmuş bir link kullandınız.", "danger")
+
+    if expired:
+        flash("Geçersiz veya süresi dolmuş link.", "danger")
         return redirect(url_for("sifremi_unuttum"))
 
     if request.method == "POST":
@@ -442,7 +490,7 @@ def sifre_sifirla(token):
         user.password_reset_expires_at = None
         db.session.commit()
 
-        flash("Şifreniz başarıyla güncellendi! Giriş yapabilirsiniz.", "success")
+        flash("Şifreniz başarıyla güncellendi.", "success")
         return redirect(url_for("giris"))
 
     return render_template("sifre_sifirla.html", token=token)
@@ -471,10 +519,10 @@ def kullanici_profil():
 @login_required
 def tumunu_oku():
     unread = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
-    for n in unread:
-        n.is_read = True
+    for item in unread:
+        item.is_read = True
     db.session.commit()
-    flash("Tüm bildirimleriniz okundu olarak işaretlendi.", "success")
+    flash("Tüm bildirimler okundu olarak işaretlendi.", "success")
     return redirect(url_for("bildirimler"))
 
 
@@ -504,49 +552,59 @@ def bildirimler():
         .order_by(Notification.timestamp.desc())
         .all()
     )
+
     changed = False
-    for n in notifications:
-        if not n.is_read:
-            n.is_read = True
+    for item in notifications:
+        if not item.is_read:
+            item.is_read = True
             changed = True
+
     if changed:
         db.session.commit()
 
     return render_template("bildirimler.html", notifications=notifications)
 
 
-# ---- Ders yönetimi (admin)
+# =========================
+# DERS YÖNETİMİ
+# =========================
 @app.route("/ders-yukle", methods=["POST"])
 @login_required
 @admin_required
 def ders_yukle():
-    title = request.form.get("title")
-    slug = request.form.get("slug")
-    content = request.form.get("content")
+    title = (request.form.get("title") or "").strip()
+    slug = (request.form.get("slug") or "").strip()
+    content = request.form.get("content") or ""
 
-    main_category = request.form.get("main_category")
-    sub_category = request.form.get("sub_category")
-    description = request.form.get("description")
-    level = request.form.get("level")
-    lesson_count = request.form.get("lesson_count")
+    main_category = (request.form.get("main_category") or "").strip()
+    sub_category = (request.form.get("sub_category") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    level = (request.form.get("level") or "").strip()
+    lesson_count = request.form.get("lesson_count") or "1"
 
     if not all([title, slug, content, main_category, sub_category, description, level, lesson_count]):
         flash("Lütfen tüm zorunlu alanları doldurun.", "danger")
         return redirect(url_for("profil"))
 
-    if db.session.scalar(db.select(Lesson).filter_by(slug=slug)):
-        flash("Bu URL kısaltması zaten mevcut. Lütfen değiştirin.", "danger")
+    existing = db.session.scalar(db.select(Lesson).filter_by(slug=slug))
+    if existing:
+        flash("Bu URL kısaltması zaten mevcut.", "danger")
         return redirect(url_for("profil"))
+
+    try:
+        lesson_count_int = int(lesson_count)
+    except ValueError:
+        lesson_count_int = 1
 
     new_lesson = Lesson(
         title=title,
+        slug=slug,
         main_category=main_category,
         sub_category=sub_category,
-        slug=slug,
         content=content,
         description=description,
         level=level,
-        lesson_count=int(lesson_count),
+        lesson_count=lesson_count_int,
     )
 
     try:
@@ -555,7 +613,7 @@ def ders_yukle():
         flash(f"Ders başarıyla yüklendi: {title}", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Ders yüklenirken bir hata oluştu: {e}", "danger")
+        flash(f"Ders yüklenirken hata oluştu: {type(e).__name__}: {e}", "danger")
 
     return redirect(url_for("profil"))
 
@@ -565,19 +623,22 @@ def ders_yukle():
 @admin_required
 def ders_sil(lesson_id):
     lesson = db.session.get(Lesson, lesson_id)
-    if lesson:
-        db.session.delete(lesson)
-        db.session.commit()
-        flash(f"“{lesson.title}” başlıklı ders başarıyla silindi.", "success")
-    else:
+    if not lesson:
         flash("Silinecek ders bulunamadı.", "danger")
+        return redirect(url_for("profil"))
+
+    db.session.delete(lesson)
+    db.session.commit()
+    flash(f'"{lesson.title}" başlıklı ders silindi.', "success")
     return redirect(url_for("profil"))
 
 
 @app.route("/egitim")
 def egitim():
     all_lessons = db.session.execute(
-        db.select(Lesson).filter_by(main_category="egitim").order_by(Lesson.created_at.desc())
+        db.select(Lesson)
+        .filter_by(main_category="egitim")
+        .order_by(Lesson.created_at.desc())
     ).scalars().all()
 
     categories = {}
@@ -590,7 +651,9 @@ def egitim():
 @app.route("/gomulu")
 def gomulu():
     all_lessons = db.session.execute(
-        db.select(Lesson).filter_by(main_category="gomulu").order_by(Lesson.created_at.desc())
+        db.select(Lesson)
+        .filter_by(main_category="gomulu")
+        .order_by(Lesson.created_at.desc())
     ).scalars().all()
 
     categories = {}
@@ -602,13 +665,19 @@ def gomulu():
 
 @app.route("/ders/<slug>")
 def ders_detay(slug):
-    lesson = db.session.execute(db.select(Lesson).filter_by(slug=slug)).scalar_one_or_none()
+    lesson = db.session.execute(
+        db.select(Lesson).filter_by(slug=slug)
+    ).scalar_one_or_none()
+
     if lesson is None:
         flash("Aradığınız ders bulunamadı.", "danger")
         return redirect(url_for("egitim"))
 
     content_to_process = lesson.content.replace("\r\n", "\n").replace("\r", "\n")
-    lesson.html_content = markdown.markdown(content_to_process, extensions=["fenced_code", "tables"])
+    lesson.html_content = markdown.markdown(
+        content_to_process,
+        extensions=["fenced_code", "tables"]
+    )
 
     return render_template("ders_detay.html", lesson=lesson)
 
@@ -616,7 +685,9 @@ def ders_detay(slug):
 @app.route("/kategori/<sub_category_name>")
 def kategori_listele(sub_category_name):
     lessons = db.session.execute(
-        db.select(Lesson).filter_by(sub_category=sub_category_name).order_by(Lesson.created_at.desc())
+        db.select(Lesson)
+        .filter_by(sub_category=sub_category_name)
+        .order_by(Lesson.created_at.desc())
     ).scalars().all()
 
     display_name = (
@@ -625,10 +696,13 @@ def kategori_listele(sub_category_name):
         .replace("Siber", "Siber Güvenlik")
         .replace("Arduino", "Arduino Projeleri")
     )
+
     return render_template("kategori_listesi.html", lessons=lessons, category_name=display_name)
 
 
-# ---- Forum
+# =========================
+# FORUM
+# =========================
 @app.route("/topluluk")
 def topluluk():
     topics = (
@@ -647,8 +721,8 @@ def topluluk():
 @login_required
 def yeni_konu():
     if request.method == "POST":
-        title = request.form.get("title")
-        content = request.form.get("content")
+        title = (request.form.get("title") or "").strip()
+        content = (request.form.get("content") or "").strip()
         tags_input = request.form.get("tags", "")
 
         if not title or not content:
@@ -660,21 +734,30 @@ def yeni_konu():
         db.session.flush()
 
         tag_names = [name.strip().lower() for name in tags_input.split(",") if name.strip()]
+
         for tag_name in set(tag_names):
-            tag = db.session.execute(db.select(Tag).filter_by(name=tag_name)).scalar_one_or_none()
+            tag = db.session.execute(
+                db.select(Tag).filter_by(name=tag_name)
+            ).scalar_one_or_none()
+
             if tag is None:
                 tag = Tag(name=tag_name)
                 db.session.add(tag)
                 db.session.flush()
+
             new_topic.tags.append(tag)
 
-        first_comment = Comment(content=content, topic_id=new_topic.id, user_id=current_user.id)
+        first_comment = Comment(
+            content=content,
+            topic_id=new_topic.id,
+            user_id=current_user.id
+        )
         db.session.add(first_comment)
         db.session.commit()
 
         current_user.update_points_and_rank(20)
 
-        flash("Konunuz başarıyla açıldı!", "success")
+        flash("Konunuz başarıyla açıldı.", "success")
         return redirect(url_for("topluluk"))
 
     return render_template("yeni_konu.html")
@@ -698,12 +781,13 @@ def konu_detay(topic_id):
         .all()
     )
 
-    for c in comments:
-        c.html_content = markdown.markdown(c.content, extensions=["fenced_code"])
+    for item in comments:
+        item.html_content = markdown.markdown(item.content, extensions=["fenced_code"])
 
     if request.method == "POST" and current_user.is_authenticated:
-        content = request.form.get("content") or ""
-        if not content.strip():
+        content = (request.form.get("content") or "").strip()
+
+        if not content:
             flash("Yorum içeriği boş olamaz.", "danger")
         else:
             new_comment = Comment(content=content, topic_id=topic_id, user_id=current_user.id)
@@ -741,7 +825,7 @@ def konu_sil(topic_id):
         db.session.delete(topic)
         db.session.commit()
 
-        flash("Konu ve ilgili tüm içerikler başarıyla silindi.", "success")
+        flash("Konu ve ilgili içerikler silindi.", "success")
         return redirect(url_for("topluluk"))
 
     flash("Bu konuyu silme yetkiniz yok veya konu bulunamadı.", "danger")
@@ -766,7 +850,9 @@ def yorum_sil(comment_id):
 
 @app.route("/tag/<tag_name>")
 def tag_detay(tag_name):
-    tag = db.session.execute(db.select(Tag).filter_by(name=tag_name)).scalar_one_or_none()
+    tag = db.session.execute(
+        db.select(Tag).filter_by(name=tag_name)
+    ).scalar_one_or_none()
 
     if tag is None:
         flash(f'"{tag_name}" etiketinde konu bulunamadı.', "warning")
@@ -784,7 +870,9 @@ def arama():
         like = f"%{query}%"
 
         lesson_results = db.session.execute(
-            db.select(Lesson).filter(or_(Lesson.title.like(like), Lesson.content.like(like)))
+            db.select(Lesson).filter(
+                or_(Lesson.title.like(like), Lesson.content.like(like))
+            )
         ).scalars().all()
         results["lessons"] = lesson_results
 
@@ -801,10 +889,19 @@ def arama():
 @app.route("/iletisim", methods=["GET", "POST"])
 def iletisim():
     if request.method == "POST":
-        name = request.form.get("name") or ""
-        email = request.form.get("email") or ""
-        subject = request.form.get("subject") or ""
-        message_content = request.form.get("message") or ""
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip()
+        subject = (request.form.get("subject") or "").strip()
+        message_content = (request.form.get("message") or "").strip()
+
+        if not subject or not message_content:
+            flash("Konu ve mesaj boş olamaz.", "danger")
+            return redirect(url_for("iletisim"))
+
+        recipient = MAIL_USERNAME
+        if not recipient:
+            flash("Mail sistemi ayarlı değil.", "danger")
+            return redirect(url_for("iletisim"))
 
         msg_subject = f"İLETİŞİM FORMU: {subject} - Gönderen: {name} ({email})"
         msg_body = (
@@ -813,22 +910,14 @@ def iletisim():
             f"Mesaj:\n{message_content}"
         )
 
-        recipient = app.config["MAIL_USERNAME"]
-        if not recipient:
-            flash("Mail sistemi ayarlı değil. Lütfen daha sonra tekrar deneyin.", "danger")
-            return redirect(url_for("iletisim"))
+        ok = send_email_safely(recipient, msg_subject, msg_body)
 
-        msg = Message(msg_subject, recipients=[recipient], body=msg_body, charset="utf-8")
+        if ok:
+            flash("Mesajınız gönderildi.", "success")
+        else:
+            flash("Mail gönderilemedi. Sunucu kısıtı veya SMTP sorunu olabilir.", "danger")
 
-        try:
-            mail.send(msg)
-            flash("Mesajınız başarıyla gönderildi, en kısa sürede size dönüş yapacağız!", "success")
-            return redirect(url_for("iletisim"))
-        except Exception as e:
-            print("--- İLETİŞİM FORMU FLASK-MAIL HATASI ---")
-            print(f"{type(e).__name__}: {e}")
-            flash("Mesaj gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.", "danger")
-            return redirect(url_for("iletisim"))
+        return redirect(url_for("iletisim"))
 
     return render_template("iletisim.html")
 
@@ -844,12 +933,12 @@ def ayarlar():
             if new_theme in ["dark", "light"]:
                 current_user.theme = new_theme
                 db.session.commit()
-                flash(f'Tema tercihi başarıyla "{new_theme}" olarak güncellendi.', "success")
+                flash(f'Tema tercihi "{new_theme}" olarak güncellendi.', "success")
             else:
                 flash("Geçersiz tema tercihi.", "danger")
 
         elif action == "update_profile":
-            new_username = request.form.get("username") or ""
+            new_username = (request.form.get("username") or "").strip()
 
             current_password = request.form.get("current_password") or ""
             new_password = request.form.get("new_password") or ""
@@ -863,7 +952,7 @@ def ayarlar():
                     return redirect(url_for("ayarlar"))
 
                 if not current_user.check_password(current_password):
-                    flash("Mevcut şifreniz yanlış. Lütfen kontrol edin.", "danger")
+                    flash("Mevcut şifreniz yanlış.", "danger")
                     return redirect(url_for("ayarlar"))
 
                 if new_password != confirm_password:
@@ -872,7 +961,7 @@ def ayarlar():
 
                 current_user.set_password(new_password)
                 updated = True
-                flash("Şifre başarıyla güncellendi.", "success")
+                flash("Şifre güncellendi.", "success")
 
             if new_username and new_username != current_user.username:
                 existing = db.session.scalar(db.select(User).filter_by(username=new_username))
@@ -882,12 +971,12 @@ def ayarlar():
 
                 current_user.username = new_username
                 updated = True
-                flash("Kullanıcı adı başarıyla güncellendi.", "success")
+                flash("Kullanıcı adı güncellendi.", "success")
 
             if updated:
                 db.session.commit()
             else:
-                flash("Güncellenecek herhangi bir bilgi girmediniz.", "warning")
+                flash("Güncellenecek bir bilgi girmediniz.", "warning")
 
         elif action == "upload_avatar":
             if "avatar" not in request.files:
@@ -900,12 +989,11 @@ def ayarlar():
                 return redirect(url_for("ayarlar"))
 
             if not allowed_file(file.filename):
-                flash("Geçersiz dosya türü. Sadece PNG, JPG, JPEG, GIF desteklenir (Max 1MB).", "danger")
+                flash("Geçersiz dosya türü. Sadece PNG/JPG/JPEG/GIF desteklenir.", "danger")
                 return redirect(url_for("ayarlar"))
 
             filename = secure_filename(file.filename)
             ext = filename.rsplit(".", 1)[1].lower()
-
             new_filename = f"user_{current_user.id}.{ext}"
             filepath = os.path.join(app.config["UPLOAD_FOLDER"], new_filename)
 
@@ -915,11 +1003,62 @@ def ayarlar():
             current_user.avatar_filename = new_filename
             db.session.commit()
 
-            flash("Profil resminiz başarıyla güncellendi.", "success")
+            flash("Profil resminiz güncellendi.", "success")
 
         return redirect(url_for("ayarlar"))
 
     return render_template("ayarlar.html")
+
+
+# =========================
+# ADMIN: LESSON IMPORT
+# lessons_seed.json repo kökünde olmalı
+# =========================
+@app.route("/admin/import-lessons", methods=["POST"])
+@login_required
+@admin_required
+def import_lessons():
+    seed_path = os.path.join(BASE_DIR, "lessons_seed.json")
+
+    if not os.path.exists(seed_path):
+        flash("lessons_seed.json bulunamadı.", "danger")
+        return redirect(url_for("profil"))
+
+    with open(seed_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    created = 0
+    skipped = 0
+
+    for item in data:
+        slug = item.get("slug")
+        if not slug:
+            continue
+
+        exists = db.session.execute(
+            db.select(Lesson).filter_by(slug=slug)
+        ).scalar_one_or_none()
+
+        if exists:
+            skipped += 1
+            continue
+
+        lesson = Lesson(
+            title=(item.get("title") or "Ders").strip(),
+            slug=slug,
+            main_category=item.get("main_category") or "egitim",
+            sub_category=item.get("sub_category") or "Genel",
+            content=item.get("content") or "",
+            level=item.get("level") or "Başlangıç",
+            lesson_count=int(item.get("lesson_count") or 1),
+            description=item.get("description") or "",
+        )
+        db.session.add(lesson)
+        created += 1
+
+    db.session.commit()
+    flash(f"Import tamamlandı: {created} eklendi, {skipped} zaten vardı.", "success")
+    return redirect(url_for("profil"))
 
 
 # =========================
@@ -931,7 +1070,10 @@ def init_db_and_admin():
     admin_email = os.getenv("ADMIN_EMAIL", "admin@techhubtr.com")
     admin_password = os.getenv("ADMIN_PASSWORD", "degistir-bunu")
 
-    admin_user = db.session.execute(db.select(User).filter_by(email=admin_email)).scalar_one_or_none()
+    admin_user = db.session.execute(
+        db.select(User).filter_by(email=admin_email)
+    ).scalar_one_or_none()
+
     if not admin_user:
         admin = User(
             username="AdminUser",
@@ -952,24 +1094,23 @@ def init_db_and_admin():
 
 
 # =========================
-# BOOTSTRAP (Gunicorn/Render)
+# BOOTSTRAP
 # =========================
-# Gunicorn app:app ile import edince __main__ çalışmaz. O yüzden burada init ediyoruz.
 try:
     ensure_folders()
     with app.app_context():
         init_db_and_admin()
+    print("BOOT OK. DB:", app.config["SQLALCHEMY_DATABASE_URI"][:80], "...")
 except Exception as e:
     print("BOOTSTRAP ERROR:", type(e).__name__, e)
 
 
 # =========================
-# MAIN (Local dev)
+# MAIN
 # =========================
 if __name__ == "__main__":
     ensure_folders()
     with app.app_context():
         init_db_and_admin()
 
-    # Localde istersen debug aç, Render'da zaten gunicorn kullanılıyor
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=True)

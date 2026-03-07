@@ -7,19 +7,35 @@
 {% block content %}
 <div class="profile-container">
     <h2 class="profile-header">Yönetici Paneli (Merhaba, {{ current_user.username }})</h2>
-    
+
     <div class="profile-info">
-        <p><strong>Giriş Başarılı.</strong> Bu alan, dersleri yükleyeceğin ve kullanıcıları yöneteceğin Yönetici Kontrol Paneli olacak.</p>
+        <p><strong>Giriş Başarılı.</strong> Bu alan dersleri yükleyeceğin ve yöneteceğin yönetici panelidir.</p>
         <p>E-posta Adresi: {{ current_user.email }}</p>
     </div>
 
     <hr style="border-top: 1px solid #444; margin-top: 20px; margin-bottom: 30px;">
 
+    <div class="admin-tools">
+        <h3>Yönetici Araçları</h3>
+        <div class="tool-buttons">
+            <form action="{{ url_for('import_lessons') }}" method="POST">
+                <button type="submit" class="submit-btn secondary-btn"
+                        onclick="return confirm('lessons_seed.json içindeki dersler veritabanına aktarılacak. Devam edilsin mi?')">
+                    Dersleri Import Et
+                </button>
+            </form>
+        </div>
+        <p class="helper-text">
+            Bu buton, <code>lessons_seed.json</code> içindeki dersleri sisteme aktarır. Zaten var olan dersler tekrar eklenmez.
+        </p>
+    </div>
+
+    <hr style="border-top: 1px solid #444; margin-top: 30px; margin-bottom: 30px;">
+
     <h3>Yeni Ders İçeriği Yükle</h3>
-    
-    <!-- KRİTİK ÇÖZÜM: Form standart hale getirildi, TinyMCE referansları kaldırıldı -->
-    <form action="{{ url_for('ders_yukle') }}" method="POST"> 
-        
+
+    <form action="{{ url_for('ders_yukle') }}" method="POST">
+
         <div class="form-group">
             <label for="title">Ders Başlığı (Örn: Python'da İlk Adımlar)</label>
             <input type="text" id="title" name="title" required>
@@ -28,87 +44,86 @@
         <div class="form-group">
             <label for="main_category">1. Ana Kategori (Görüntülenecek Sayfa):</label>
             <select id="main_category" name="main_category" required>
-                <option value="egitim">Yazılım/Eğitim</option>
+                <option value="egitim">Yazılım / Eğitim</option>
                 <option value="gomulu">Gömülü Sistemler</option>
             </select>
         </div>
-        
+
         <div class="form-group">
-            <label for="sub_category">2. Alt Konu Etiketi (Örn: Python, C++, Arduino):</label>
+            <label for="sub_category">2. Alt Konu Etiketi (Örn: Python, C++, Arduino)</label>
             <input type="text" id="sub_category" name="sub_category" required>
         </div>
 
         <div class="form-group">
-            <label for="description">Kart Açıklaması (Kısa özet):</label>
+            <label for="description">Kart Açıklaması (Kısa özet)</label>
             <textarea id="description" name="description" required rows="2"></textarea>
         </div>
 
-        <div class="form-group" style="display: flex; gap: 20px;">
-            <div style="flex: 1;">
-                <label for="level">Seviye:</label>
+        <div class="form-group double-group">
+            <div class="half-group">
+                <label for="level">Seviye</label>
                 <select id="level" name="level">
                     <option value="Başlangıç">Başlangıç</option>
                     <option value="Orta">Orta</option>
                     <option value="İleri">İleri</option>
                 </select>
             </div>
-            <div style="flex: 1;">
-                <label for="lesson_count">Modül Sayısı:</label>
+
+            <div class="half-group">
+                <label for="lesson_count">Modül Sayısı</label>
                 <input type="number" id="lesson_count" name="lesson_count" value="1" min="1">
             </div>
         </div>
-        
+
         <div class="form-group">
             <label for="slug">URL Kısaltması (Örn: python-ilk-adimlar)</label>
             <input type="text" id="slug" name="slug" required>
         </div>
 
-        <!-- DERS İÇERİĞİ: Standart, düz metin/Markdown girişi için textarea -->
         <div class="form-group">
-            <label for="content">Ders İçeriği (Markdown formatında girin):</label>
+            <label for="content">Ders İçeriği (Markdown formatında girin)</label>
             <textarea id="content" name="content" required rows="15"></textarea>
         </div>
-        
-        <!-- Buton tekrar submit type oldu -->
+
         <button type="submit" class="submit-btn">Dersi Kaydet ve Yayımla</button>
     </form>
-    
-    <hr style="border-top: 1px solid #444; margin-top: 30px;">
-    
-    <!-- YAYINLANMIŞ DERSLERİ YÖNETME KISMI -->
+
+    <hr style="border-top: 1px solid #444; margin-top: 30px; margin-bottom: 30px;">
+
     <h3>Yayınlanmış Dersleri Yönet ({{ all_lessons|length }} Ders)</h3>
 
     <div class="lesson-management">
         {% if all_lessons %}
             {% for lesson in all_lessons %}
                 <div class="list-item-management">
-                    <p style="margin: 0;">
-                        <strong>{{ lesson.title }}</strong> 
-                        <span style="opacity: 0.7; font-size: 0.9em;">
-                            ({{ lesson.main_category|upper }} / {{ lesson.sub_category }} / {{ lesson.created_at.strftime('%d %b') }})
-                        </span>
-                    </p>
+                    <div class="lesson-info">
+                        <p class="lesson-title-row">
+                            <strong>{{ lesson.title }}</strong>
+                            <span class="lesson-meta">
+                                ({{ lesson.main_category|upper }} / {{ lesson.sub_category }} / {{ lesson.created_at.strftime('%d %b') }})
+                            </span>
+                        </p>
+                        <p class="lesson-slug">Slug: /ders/{{ lesson.slug }}</p>
+                    </div>
+
                     <div class="actions">
-                        <a href="{{ url_for('ders_sil', lesson_id=lesson.id) }}" 
-                           class="cta-button" 
-                           style="background-color: #e74c3c; padding: 5px 10px; font-size: 0.9em; text-decoration: none;"
-                           onclick="return confirm('Emin misiniz? Ders kalıcı olarak silinecektir: {{ lesson.title }}')">
-                            Sil
-                        </a>
+                        <form action="{{ url_for('ders_sil', lesson_id=lesson.id) }}" method="POST" style="display:inline;">
+                            <button type="submit"
+                                    class="danger-btn"
+                                    onclick="return confirm('Emin misiniz? Bu ders kalıcı olarak silinecektir: {{ lesson.title }}')">
+                                Sil
+                            </button>
+                        </form>
                     </div>
                 </div>
             {% endfor %}
         {% else %}
-            <p style="opacity: 0.7; padding-top: 10px;">Henüz yayınlanmış dersiniz yok.</p>
+            <p class="empty-text">Henüz yayınlanmış dersiniz yok.</p>
         {% endif %}
     </div>
-
 </div>
 
-<!-- Sayfa sonundaki TinyMCE script'leri SİLİNMELİDİR -->
-<!-- (Eğer bu kod base.html'den türetiliyorsa, bu kısım da base.html'de olmamalıdır.) -->
 <style>
-    /* Yönetici Paneli CSS'leri (Gerekli stiller bu blokta tutulur) */
     .profile-container {
         max-width: 900px;
         margin: 50px auto;
@@ -117,21 +132,45 @@
         border-radius: 8px;
         box-shadow: 0 0 15px rgba(0, 189, 212, 0.4);
     }
+
     .profile-header {
         color: var(--vurgu-renk);
         border-bottom: 2px solid #333;
         padding-bottom: 15px;
         margin-bottom: 20px;
     }
+
+    .admin-tools {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 18px;
+    }
+
+    .tool-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .helper-text {
+        opacity: 0.75;
+        margin-top: 10px;
+        font-size: 0.95em;
+    }
+
     .form-group {
         margin-bottom: 20px;
     }
+
     .form-group label {
         display: block;
         margin-bottom: 8px;
         font-weight: bold;
         color: var(--vurgu-renk);
     }
+
     .form-group input[type="text"],
     .form-group input[type="number"],
     .form-group select,
@@ -144,29 +183,109 @@
         border-radius: 4px;
         box-sizing: border-box;
     }
+
     .form-group textarea {
         min-height: 200px;
-        font-family: 'Consolas', monospace; /* Monospace font, kod yazımını kolaylaştırır */
+        font-family: Consolas, monospace;
     }
-    .submit-btn {
-        background-color: var(--vurgu-renk);
-        color: var(--arka-alan);
-        padding: 12px 30px;
+
+    .double-group {
+        display: flex;
+        gap: 20px;
+    }
+
+    .half-group {
+        flex: 1;
+    }
+
+    .submit-btn,
+    .danger-btn {
+        padding: 12px 20px;
         border: none;
         border-radius: 5px;
         cursor: pointer;
         font-weight: bold;
-        transition: background-color 0.3s;
+        transition: 0.3s ease;
     }
+
+    .submit-btn {
+        background-color: var(--vurgu-renk);
+        color: var(--arka-alan);
+    }
+
     .submit-btn:hover {
         background-color: #00a4b4;
     }
+
+    .secondary-btn {
+        background-color: #5865f2;
+        color: white;
+    }
+
+    .secondary-btn:hover {
+        background-color: #4854d4;
+    }
+
+    .danger-btn {
+        background-color: #e74c3c;
+        color: white;
+        padding: 8px 14px;
+        font-size: 0.9em;
+    }
+
+    .danger-btn:hover {
+        background-color: #c0392b;
+    }
+
     .list-item-management {
         border-bottom: 1px solid #333;
-        padding: 10px 0;
+        padding: 14px 0;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 20px;
+    }
+
+    .lesson-info {
+        flex: 1;
+    }
+
+    .lesson-title-row {
+        margin: 0 0 6px 0;
+    }
+
+    .lesson-meta {
+        opacity: 0.7;
+        font-size: 0.9em;
+    }
+
+    .lesson-slug {
+        margin: 0;
+        opacity: 0.65;
+        font-size: 0.9em;
+        font-family: Consolas, monospace;
+    }
+
+    .empty-text {
+        opacity: 0.7;
+        padding-top: 10px;
+    }
+
+    @media (max-width: 768px) {
+        .double-group,
+        .list-item-management {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .actions {
+            width: 100%;
+        }
+
+        .actions form,
+        .danger-btn {
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
